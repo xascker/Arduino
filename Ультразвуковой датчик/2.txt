@@ -1,0 +1,45 @@
+В модели HC-SR04 есть 4 контакта, которые мы и будем использовать для подключения к Arduino.
+*VCC подключим к +5V на Arduino 
+*Trig к цифровому пину 8 на Arduino 
+*Echo к цифровому пину 9 на Arduino 
+*GND к GND на Arduino 
+
+Для наглядности я еще подключил светодиод между GND и 11 цифровым пином Arduino. Если у вас светодиода под рукой не оказалось, то тогда можете использовать светодиод на 13 пине Arduino.
+
+Теперь нам надо загрузить скетч. Он написан так, что при расстоянии менее 50 сантиметров наш светодиод загорается, а  в окне Serial Monitor выводилось расстояние в сантиметрах.
+
+
+const int Trig = 8;
+const int Echo = 9; 
+const int ledPin = 11;  // 13 – если будете использовать встроенный в Arduino светодиод
+
+void setup() { 
+
+pinMode(Trig, OUTPUT); 
+pinMode(Echo, INPUT); 
+pinMode(ledPin, OUTPUT);   
+Serial.begin(9600); 
+} 
+
+unsigned int time_us=0; //unsigned - специальный тип фиксированного размера
+
+unsigned int distance_sm=0; 
+
+void loop() { 
+
+ digitalWrite(Trig, HIGH); // Подаем сигнал на выход микроконтроллера 
+ delayMicroseconds(10); // Удерживаем 10 микросекунд 
+ digitalWrite(Trig, LOW); // Затем убираем 
+ time_us=pulseIn(Echo, HIGH); // pulseIn(*,HIGH) - Замеряем длину импульса 
+ distance_sm=time_us/58; // Пересчитываем в сантиметры (S = Tus/58, [см] где Tus - длительность эхо импульса в микросекундах, а 58 - константа. )
+ Serial.println(distance_sm); // Выводим на порт
+
+if (distance_sm<50) // Если расстояние менее 50 сантиметром 
+{   
+ digitalWrite(ledPin, 1); // Зажигаем светодиод 
+} 
+ else {    
+  digitalWrite(ledPin, 0); // иначе тушим 
+}   
+ delay(100); 
+}

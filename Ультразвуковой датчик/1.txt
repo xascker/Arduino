@@ -1,0 +1,87 @@
+int pingPin = 4;//пин для выхода trig
+
+int inPin = 7;//пин для выхода echo
+
+void setup() {
+  Serial.begin(9600); // соединение с компом со скоростью 9600кб/с
+  pinMode(inPin, INPUT);
+  pinMode(pingPin, OUTPUT);
+  digitalWrite(pingPin, LOW);
+}
+ 
+void loop() {
+  long duration, cm,tmp1;//объявляем переменные
+  //посылаем датчику сигнал начала замера (высокий уровень на 10 мкс)
+  digitalWrite(pingPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(pingPin, LOW);
+  //делаем паузу чтобы датчик успел среагировать
+  delayMicroseconds(500);
+  //засекаем время в микросекундах
+  tmp1=micros();
+  //ждем пока сигнал на выходе echo не станет низкий
+  while(digitalRead(inPin)==HIGH){
+    //если долго нет ответа от датчика, значит препятствий в зоне видимости нет, выходим по таймауту
+    if(micros()-tmp1 > 15000)
+      break;
+  }
+  //вычисляем время "полета" ультразвукового сигнала
+  duration=micros()-tmp1;
+  cm = microsecondsToCentimeters(duration);//переводим время в сантиметры
+  Serial.print("Distance: ");
+  //если помех не обнаружено сообщаем что расстояние более 1.5 метра
+  if(duration>15000)
+    Serial.println(">1.5m");
+  else
+    Serial.println(cm);//иначе выводим расстояние до помехи в сантиметрах
+  delay(1000);
+}
+long microsecondsToCentimeters(long microseconds)
+{
+  //скорость звука 340 м/с или 29,412 микросекунд/см, а поскольку звук летит до помехи и обратно, делим результат на двое
+  return microseconds / 29.412 / 2;
+}
+
+*****************************************************
+
+#define Trig 9
+#define Echo 8
+#define ledPin 13
+
+void setup() 
+{  
+  pinMode(Trig, OUTPUT); //инициируем как выход 
+  pinMode(Echo, INPUT); //инициируем как вход 
+  pinMode(ledPin, OUTPUT); 
+  Serial.begin(9600); 
+  /* задаем скорость общения. В нашем случае с компьютером */
+} 
+unsigned int impulseTime=0; 
+unsigned int distance_sm=0; 
+
+void loop() 
+{  
+  digitalWrite(Trig, HIGH); 
+  /* Подаем импульс на вход trig дальномера */
+  delayMicroseconds(10); // равный 10 микросекундам 
+  digitalWrite(Trig, LOW); // Отключаем 
+  impulseTime=pulseIn(Echo, HIGH); // pulseIn(*,HIGH) - Замеряет длину импульса 
+  distance_sm=impulseTime/58; // Пересчитываем в сантиметры 
+  Serial.println(distance_sm); // Выводим на порт 
+  if (distance_sm<30) // Если расстояние менее 30 сантиметром 
+  {     
+    digitalWrite(ledPin, HIGH); // Светодиод горит 
+  }  
+  else 
+  {   
+    digitalWrite(ledPin, LOW); // иначе не горит 
+  }   
+  delay(100); 
+  /* ждем 0.1 секунды, Следующий импульс может быть излучён, только после исчезновения эха от предыдущего. 
+   Это время называется периодом цикла (cycle period). 
+   Рекомендованный период между импульсами должен быть не менее 50 мс.  */
+}
+
+
+**********************************************************
+

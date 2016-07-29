@@ -1,0 +1,2 @@
+Key in HEX bytes ->1 61 4B 5 0 0 0 D1  -  Мой, от моего подъезда
+Key in HEX bytes ->1 F3 90 5C 0 0 0 6B  - Мама, мамен подъездKey in HEX bytes ->1 63 9E B3 0 0 0 AB  - МашаKey in HEX bytes ->1 37 9E 7B 1 0 0 D7 - Мастер ключ

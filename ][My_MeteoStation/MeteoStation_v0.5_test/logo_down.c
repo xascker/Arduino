@@ -1,0 +1,5 @@
+#include <avr/pgmspace.h>
+
+const uint8_t logo_down[] PROGMEM={
+0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
+};
