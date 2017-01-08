@@ -113,7 +113,12 @@ void mode_setup(){
     }
     if(++mode >= 3 ) mode = 0; 
     _delay_ms(50);
-    EEPROM_write(7,mode); //Запись в EEPROM режим будущего режима
+    EEPROM_write(7,mode); //Запись в EEPROM  будущий режим
+    _delay_ms(3000);     
+    if(mode == 0) mode = 3;
+    mode--;
+    _delay_ms(10);
+    EEPROM_write(7,mode); //Запись в EEPROM  текущий режим
     _delay_ms(10);
 }
 
