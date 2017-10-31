@@ -31,14 +31,14 @@ void loop(){
   digitalWrite(key4,LOW);
   
 
-//   for (int a=0; a<=9; a++){
-//       // a=0;
-//      show(a);
-//   delay(500);
-//     }
+   for (int a=0; a<=9; a++){
+       // a=0;
+      show(a);
+   delay(250);
+     }
 
-int a=3;
-show(a);
+//int a=3;
+//show(a);
 }
  
 // void show(int a[])
