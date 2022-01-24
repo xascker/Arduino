@@ -1,0 +1,331 @@
+#include <util/delay.h>
+#include <EEPROM.h>
+#include <OLED_I2C.h>
+#include <EncButton.h>
+
+EncButton<EB_TICK, 2, 3, 4> enc;  // энкодер с кнопкой | CLK -> 2; DT -> 3; SW -> 4
+
+// Display:  SDA pin   -> Arduino Analog 4 or the dedicated SDA pin
+//           SCL pin   -> Arduino Analog 5 or the dedicated SCL pin
+// Buttons: 7 -> Left; 3 -> Menu; 4 -> Right
+
+OLED myGLCD(SDA, SCL); // подключение дисплея
+#define contrast 65    // контрастность дисплея
+extern uint8_t SmallFont[], MediumNumbers[], TinyFont[], BigNumbers[];
+extern uint8_t logo[];
+
+#define SensorPin  A0 // пин датчика давления
+#define SwitcherPin 9 // пин переключателя реле
+String ver= "1.0";    // версия прошивки
+
+int SensorValue, PressureValue;
+int n_menu = 0;
+byte menu = 0;
+
+// Настройка, калибровка
+int  AnalogLow = 104;   // аналоговое значение при котором значение давления равно 0. нужно для ф-и map
+int  AnalogHigh = 922;  // аналоговое значение при котором значение давления равно максимальному. нужно для ф-и map
+int  PressureLow = 0;   // 0 бар. нужно для ф-и map
+int  PressureHigh = 55; // ~5.5 бар. нужно для ф-и map
+int  PinUp = 120;       // аналоговое значение при котором подаем 1 на пин
+int  PinDown = 250;     // аналоговое значение при котором подаем 0 на пин
+
+
+void setup() {
+  //Serial.begin(9600);
+  pinMode(SwitcherPin, OUTPUT);
+  EEpromRead();
+  lcd_init();
+
+  attachInterrupt(0, isr, CHANGE);  // енкодор. D2
+  attachInterrupt(1, isr, CHANGE);  // енкодор. D3
+}
+
+void isr() {
+  enc.tickISR();  // енкодор. в прерывании вызываем тик ISR
+}
+
+void loop() {
+  SensorRead();
+  Switcher();
+  Encoder();
+}
+
+void Encoder() {
+  
+  switch (menu) {
+    case 0:
+      lcd_main();
+      break;
+    case 1:
+      lcd_sys();
+      break;
+    case 10:
+      lcd_sys_0();
+      break;
+    case 11:
+      lcd_sys_1();
+      break;
+    case 12:
+      lcd_sys_2();
+      break;
+    case 13:
+      lcd_sys_3();
+      break;
+    case 14:
+      lcd_sys_4();
+      break;    
+    case 15:
+      lcd_sys_5();
+      break;
+  }
+  
+  if ( enc.tick() ) {
+    if ( enc.step( )) menu = 1;
+
+    if ( menu == 1 ) {
+      if ( enc.counter > 7 ) enc.counter = 0;
+      if ( enc.counter < 0 ) enc.counter = 7;
+      n_menu = enc.counter;
+      //Serial.println((String)"n_menu " + n_menu);
+
+      if ( n_menu == 0 && enc.click() ){
+        menu = 10;
+        enc.counter = AnalogLow;
+      }
+      if ( n_menu == 1 && enc.click() ){
+        menu = 11;
+        enc.counter = AnalogHigh;
+      }
+      if ( n_menu == 2 && enc.click() ){
+        menu = 12;
+        enc.counter = PressureLow;
+      }
+      if ( n_menu == 3 && enc.click() ){
+        menu = 13;
+        enc.counter = PressureHigh;
+      }
+      if ( n_menu == 4 && enc.click() ){
+        menu = 14;
+        enc.counter = PinUp;
+      }
+      if ( n_menu == 5 && enc.click() ){
+        menu = 15;
+        enc.counter = PinDown;
+      }
+      if ( n_menu == 6 && enc.click() ){
+        menu = 0;
+      }
+      if ( n_menu == 7 && enc.click() ){
+        EEpromWrite();
+        menu = 0;
+      }
+    }
+    // в конце лучше вызвать resetState(), чтобы сбросить необработанные флаги!
+    enc.resetState();
+  }
+}
+
+void Switcher() {
+   if ( SensorValue <= PinUp )  digitalWrite(SwitcherPin, HIGH);
+   if ( SensorValue >= PinDown )  digitalWrite(SwitcherPin, LOW);
+}
+
+void SensorRead() {
+  //int rawReading = analogRead(SensorPin);
+  int SensorData[10];
+  char j;
+  int AvrSensorValue;
+
+  for (j = 0; j < 10; j++) { // забиваем масив значеними с датчика
+    SensorData[j] = analogRead(SensorPin);
+    delay(20);
+  }
+
+  AvrSensorValue = 0;
+  for (j = 0; j < 10; j++) { // получаем среднее значение с дачика
+    AvrSensorValue = AvrSensorValue + SensorData[j]; 
+  }
+  
+  AvrSensorValue = AvrSensorValue / 10;              
+  SensorValue = AvrSensorValue;
+  //float volts = SensorValue / 204.6;
+
+  PressureValue = map(SensorValue, AnalogLow, AnalogHigh, PressureLow, PressureHigh);
+
+  //Serial.println((String) AvrSensorValue);
+  //Serial.println((String)rawReading + " -> " + AvrSensorValue + " -> " + volts);
+  //Serial.print(AvrSensorValue);
+  //Serial.print(',');
+  //Serial.println(rawReading);
+}
+
+void lcd_sys_0() { //вывод на дисплей меню настройки AnalogLow
+  if ( enc.tick() ) {
+    if ( enc.counter > 1023 ) enc.counter = 0;
+    if ( enc.counter < 0 ) enc.counter = 1023;
+    if (enc.click()) {
+      AnalogLow = enc.counter;
+      enc.counter = 0;
+      menu = 1;
+    }
+    enc.resetState(); 
+  }
+  myGLCD.clrScr();
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("AnalogLow", 8, 0); myGLCD.printNumI(enc.counter, RIGHT, 0); 
+  myGLCD.update();
+}
+
+void lcd_sys_1() { //вывод на дисплей меню настройки AnalogHigh
+  if ( enc.tick() ) {
+    if ( enc.counter > 1023 ) enc.counter = 0;
+    if ( enc.counter < 0 ) enc.counter = 1023;
+    if (enc.click()) {
+      AnalogHigh = enc.counter;
+      enc.counter = 1;
+      menu = 1;
+    }
+    enc.resetState(); 
+  }
+  myGLCD.clrScr();
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("AnalogHigh", 8, 8); myGLCD.printNumI(enc.counter, RIGHT, 8); 
+  myGLCD.update();
+}
+
+void lcd_sys_2() { //вывод на дисплей меню настройки PressureLow
+  if ( enc.tick() ) {
+    if ( enc.counter > 60 ) enc.counter = 0;
+    if ( enc.counter < 0 ) enc.counter = 60;
+    if (enc.click()) {
+      PressureLow = enc.counter;
+      enc.counter = 2;
+      menu = 1;
+    }
+    enc.resetState(); 
+  }
+  myGLCD.clrScr();
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("PressureLow", 8, 16); myGLCD.printNumI(enc.counter, RIGHT, 16);
+  myGLCD.update();
+}
+
+void lcd_sys_3() { //вывод на дисплей меню настройки PressureHigh
+  if ( enc.tick() ) {
+    if ( enc.counter > 60 ) enc.counter = 0;
+    if ( enc.counter < 0 ) enc.counter = 60;
+    if (enc.click()) {
+      PressureHigh = enc.counter;
+      enc.counter = 3;
+      menu = 1;
+    }
+    enc.resetState(); 
+  }
+  myGLCD.clrScr();
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("PressureHigh", 8, 24); myGLCD.printNumI(enc.counter, RIGHT, 24);
+  myGLCD.update();
+}
+
+void lcd_sys_4() { //вывод на дисплей меню настройки PinUp
+  if ( enc.tick() ) {
+    if ( enc.counter > 1023 ) enc.counter = 0;
+    if ( enc.counter < 0 ) enc.counter = 1023;
+    if (enc.click()) {
+      PinUp = enc.counter;
+      enc.counter = 4;
+      menu = 1;
+    }
+    enc.resetState(); 
+  }
+  myGLCD.clrScr();
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("PinUp", 8, 32); myGLCD.printNumI(enc.counter, RIGHT, 32);
+  myGLCD.update();
+}
+
+void lcd_sys_5() { //вывод на дисплей меню настройки PinDown
+  if ( enc.tick() ) {
+    if ( enc.counter > 1023 ) enc.counter = 0;
+    if ( enc.counter < 0 ) enc.counter = 1023;
+    if (enc.click()) {
+      PinDown = enc.counter;
+      enc.counter = 5;
+      menu = 1;
+    }
+    enc.resetState(); 
+  }
+  myGLCD.clrScr();
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("PinDown", 8, 40); myGLCD.printNumI(enc.counter, RIGHT, 40);
+  myGLCD.update();
+}
+
+void lcd_sys() { //вывод на дисплей меню настройки
+  myGLCD.clrScr();
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("AnalogLow", 8, 0); myGLCD.printNumI(AnalogLow, RIGHT, 0); 
+  myGLCD.print("AnalogHigh", 8, 8); myGLCD.printNumI(AnalogHigh, RIGHT, 8); 
+  myGLCD.print("PressureLow", 8, 16); myGLCD.printNumI(PressureLow, RIGHT, 16);
+  myGLCD.print("PressureHigh", 8, 24); myGLCD.printNumI(PressureHigh, RIGHT, 24);
+  myGLCD.print("PinUp", 8, 32); myGLCD.printNumI(PinUp, RIGHT, 32); 
+  myGLCD.print("PinDown", 8, 40); myGLCD.printNumI(PinDown, RIGHT, 40);
+  myGLCD.print("OUT", 8, 48);
+  myGLCD.print("SAVE", 8, 56);
+  myGLCD.print(">", 0, n_menu * 8);
+  myGLCD.update();
+}
+
+void lcd_main() { // основной экран
+  myGLCD.clrScr();
+  myGLCD.setFont(BigNumbers);
+  myGLCD.printNumI(PressureValue, CENTER, 0);
+  myGLCD.setFont(MediumNumbers);
+  myGLCD.printNumI(SensorValue, LEFT, 48);
+  myGLCD.printNumI(( SensorValue / 204.6 ) * 100, RIGHT, 48);
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("Anolg", LEFT, 41);
+  myGLCD.print("Volt", RIGHT, 41);
+  myGLCD.update();
+}
+
+void lcd_init() { // заставка, лого
+  myGLCD.begin();
+  myGLCD.setBrightness(contrast);
+  myGLCD.clrScr();
+  myGLCD.drawBitmap(0, 0, logo, 128, 23);
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("Arduino", CENTER, 32);
+  myGLCD.print("Pressure Switch", CENTER, 40);
+  myGLCD.print("v"+ver, CENTER, 48);
+  myGLCD.update();
+  delay(1000);
+}
+
+void EEpromWrite() { //запись настроек в память
+  EEPROM.write(0, 111);
+  EEPROM.put(10, AnalogLow);
+  EEPROM.put(20, AnalogHigh);
+  EEPROM.put(30, PressureLow);
+  EEPROM.put(40, PressureHigh);
+  EEPROM.put(50, PinUp);
+  EEPROM.put(60, PinDown);
+  myGLCD.clrScr();
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("Save OK", CENTER, 24);
+  myGLCD.update();
+  _delay_ms(1000);
+}
+
+void EEpromRead() { //чтание настроек из памяти
+  if (EEPROM.read(0) == 111) {
+    EEPROM.get(10, AnalogLow);
+    EEPROM.get(20, AnalogHigh) ;
+    EEPROM.get(30, PressureLow);
+    EEPROM.get(40, PressureHigh);
+    EEPROM.get(50, PinUp);
+    EEPROM.get(60, PinDown) ;
+  }
+  _delay_ms(10);
+}
