@@ -188,7 +188,7 @@ void readSensors() {
           case S_IDLE: stepFader(1, 0); systemState = S_WORK; break;
           case S_WORK:
             if (effDir == 1) {
-              stepFader(0, 1); systemState = S_IDLE;
+              delay(5000); stepFader(0, 1); systemState = S_IDLE; // wait 5 sec before off
               strip.clear(); strip.show(); return;
             } break;
         }

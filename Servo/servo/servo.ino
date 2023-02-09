@@ -1,6 +1,3 @@
-/*
-Arduino Servo
-*/
 #include "Servo.h"
 Servo servoMain; // Обьект Servo
  
